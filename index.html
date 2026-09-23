@@ -746,6 +746,13 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
                      // metrics above, so its delta chip's up/down colors also run backwards
                      // from Revenue/Sessions.
                      invertDelta: true,
+                     // ASR's own value is already a percentage, so its delta is a
+                     // percentage-POINT difference (e.g. 46.25% vs 43.94% is "+2.3pp"),
+                     // never a relative percent-of-percent change -- that reads as a much
+                     // larger, misleading swing (e.g. "+5.3%" for the same two numbers,
+                     // which is (46.25-43.94)/43.94, not what a percentage-point reader
+                     // expects). See the compareSummary delta-computation branch below.
+                     isPercent: true,
                      daySummary: function(d){ var row = dailyByDate[d]; return (row.total_spend > 0 && row.net_sales > 0) ? (row.total_spend/row.net_sales)*100 : null; } }
   };
   var metricOrder = ['net_sales', 'meta_spend', 'google_spend', 'sessions', 'hourly_asr'];
@@ -964,26 +971,31 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       var compTillSum = partialSummary(activeMetric, hhCompare, lastCompleteHour);
       var compFullSum = def.daySummary(hhCompare);
       dateSum = partialSummary(activeMetric, hhDate, lastCompleteHour);
+      // For a percentage-type metric (ASR), the delta is the plain point difference
+      // between two already-percentage values, not a relative percent-of-percent
+      // change -- see the isPercent note on hourly_asr's metricDef above.
       var delta = (compTillSum !== null && compTillSum !== undefined && compTillSum !== 0 && dateSum !== null && dateSum !== undefined)
-        ? ((dateSum - compTillSum) / Math.abs(compTillSum)) * 100 : null;
+        ? (def.isPercent ? (dateSum - compTillSum) : ((dateSum - compTillSum) / Math.abs(compTillSum)) * 100) : null;
       var deltaGood = delta === null ? null : (def.invertDelta ? delta <= 0 : delta >= 0);
       var deltaCls = delta === null ? '' : (deltaGood ? 'up' : 'down');
       var deltaSign = delta === null ? '' : (delta >= 0 ? '+' : '');
+      var deltaUnit = def.isPercent ? 'pp' : '%';
       summary.innerHTML =
         '<div class="cs-item"><div class="cs-label">' + dayLabel(hhDate) + ' total</div><div class="cs-value">' + def.fmt(dateSum) +
-        (delta === null ? '' : '<span class="cs-delta ' + deltaCls + '">' + deltaSign + delta.toFixed(1) + '%</span>') + '</div></div>' +
+        (delta === null ? '' : '<span class="cs-delta ' + deltaCls + '">' + deltaSign + delta.toFixed(1) + deltaUnit + '</span>') + '</div></div>' +
         '<div class="cs-item"><div class="cs-label">' + dayLabel(hhCompare) + ' till ' + hourLabel(cutoffHour) + '</div><div class="cs-value">' + def.fmt(compTillSum) + '</div></div>' +
         '<div class="cs-item"><div class="cs-label">' + dayLabel(hhCompare) + ' total</div><div class="cs-value">' + def.fmt(compFullSum) + '</div></div>';
     } else {
       var compSum = def.daySummary(hhCompare);
       var delta = (compSum !== null && compSum !== undefined && compSum !== 0 && dateSum !== null && dateSum !== undefined)
-        ? ((dateSum - compSum) / Math.abs(compSum)) * 100 : null;
+        ? (def.isPercent ? (dateSum - compSum) : ((dateSum - compSum) / Math.abs(compSum)) * 100) : null;
       var deltaGood = delta === null ? null : (def.invertDelta ? delta <= 0 : delta >= 0);
       var deltaCls = delta === null ? '' : (deltaGood ? 'up' : 'down');
       var deltaSign = delta === null ? '' : (delta >= 0 ? '+' : '');
+      var deltaUnit = def.isPercent ? 'pp' : '%';
       summary.innerHTML =
         '<div class="cs-item"><div class="cs-label">' + dayLabel(hhDate) + ' total</div><div class="cs-value">' + def.fmt(dateSum) +
-        (delta === null ? '' : '<span class="cs-delta ' + deltaCls + '">' + deltaSign + delta.toFixed(1) + '%</span>') + '</div></div>' +
+        (delta === null ? '' : '<span class="cs-delta ' + deltaCls + '">' + deltaSign + delta.toFixed(1) + deltaUnit + '</span>') + '</div></div>' +
         '<div class="cs-item"><div class="cs-label">' + dayLabel(hhCompare) + ' total</div><div class="cs-value">' + def.fmt(compSum) + '</div></div>';
     }
   }
