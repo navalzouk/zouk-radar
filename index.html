@@ -1436,25 +1436,28 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
 
     // Table filter (v89): 4 independent checkboxes, one per table, so Naval
     // can show/hide any combination of FY / Quarterly / Month / Day rather
-    // than always scrolling past all four stacked. All 4 on by default.
+    // than always scrolling past all four stacked. Month by month is the
+    // only one on by default (Naval's most-checked view); the rest start
+    // collapsed until toggled on.
     var MV_TABLES = [
-      {key: 'fy', label: 'Financial Year', panel: 'mvPanel-fy'},
-      {key: 'quarter', label: 'Quarterly', panel: 'mvPanel-quarter'},
-      {key: 'month', label: 'Month by month', panel: 'mvPanel-month'},
-      {key: 'day', label: 'Day by day', panel: 'mvPanel-day'},
+      {key: 'fy', label: 'Financial Year', panel: 'mvPanel-fy', defaultOn: false},
+      {key: 'quarter', label: 'Quarterly', panel: 'mvPanel-quarter', defaultOn: false},
+      {key: 'month', label: 'Month by month', panel: 'mvPanel-month', defaultOn: true},
+      {key: 'day', label: 'Day by day', panel: 'mvPanel-day', defaultOn: false},
     ];
     var mvSelectEl = document.getElementById('mvTableSelect');
     if (mvSelectEl && !mvSelectEl.dataset.built) {
       mvSelectEl.dataset.built = '1';
       MV_TABLES.forEach(function(t) {
         var label = document.createElement('label');
-        label.className = 'metric-opt active';
-        label.innerHTML = '<input type="checkbox" checked>' + t.label;
+        label.className = 'metric-opt' + (t.defaultOn ? ' active' : '');
+        label.innerHTML = '<input type="checkbox"' + (t.defaultOn ? ' checked' : '') + '>' + t.label;
         mvSelectEl.appendChild(label);
         var cb = label.querySelector('input');
+        var panelEl = document.getElementById(t.panel);
+        if (panelEl) panelEl.style.display = t.defaultOn ? '' : 'none';
         cb.addEventListener('change', function() {
           label.classList.toggle('active', cb.checked);
-          var panelEl = document.getElementById(t.panel);
           if (panelEl) panelEl.style.display = cb.checked ? '' : 'none';
         });
       });
