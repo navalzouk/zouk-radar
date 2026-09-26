@@ -303,7 +303,7 @@ svg.chart { display: block; overflow: visible; }
 
 /* ---------- table ---------- */
 .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-table { border-collapse: collapse; width: 100%; min-width: 1080px; font-size: 12.5px; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 1080px; font-size: 12.5px; }
 thead th {
   position: sticky; top: 0; background: var(--surface-2); text-align: right;
   padding: 9px 12px; font-weight: 600; font-size: 10.5px; text-transform: uppercase;
@@ -336,7 +336,7 @@ tbody tr.mv-partial { background: var(--brass-dim); }
 .mv-delta-flat { color: var(--text-faint); }
 .mv-delta-up .mv-delta-tag, .mv-delta-down .mv-delta-tag { color: inherit; opacity: 0.6; }
 tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); border-bottom: 2px solid var(--border); }
-.table-scroll-body { max-height: 560px; overflow-y: auto; }
+.table-scroll-body { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
 
 .foot-note {
   font-size: 11.5px; color: var(--text-faint); margin-top: 16px; line-height: 1.6;
@@ -418,13 +418,12 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
             </div>
             <select class="daysel" id="tableDaySelect"></select>
           </div>
-          <div class="table-scroll">
-            <div class="table-scroll-body">
-              <table id="dataTable">
-                <thead><tr id="tableHead"></tr></thead>
-                <tbody id="tableBody"></tbody>
-              </table>
-            </div>
+          <div class="table-scroll-body">
+            <table id="dataTable">
+              <thead><tr id="tableHead"></tr></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
           </div>
           <div class="foot-note">
             <b>Reading this table:</b> Meta ROAS is Meta's own reported purchase conversion value &divide; Meta spend for that hour &mdash; a Meta-attributed view, distinct from the blended ROAS shown elsewhere. ASR (ad-spend ratio) is (Meta + Google spend) &divide; net sales (=Revenue) for that hour &mdash; the inverse view, on a net-of-returns basis. The small +/&minus; figures next to Meta, Total spend and Revenue compare each hour to the <i>same</i> hour on the previous day (apples to apples), not the hour before it. Revenue's chip is green when up, red when down; Meta and Total spend are a cost, so their chips run the opposite way &mdash; green when spend is <i>down</i>, red when it's up. ASR's small figure is different: rather than a % change, it's the previous day's ASR at that same point &mdash; the same hour, or for "Till Day," the same cumulative-to-hour window &mdash; shown as a value so it's directly comparable. The color lives on the main ASR figure, not that reference figure: green means it's the lower (better) of the two, red means higher; the reference figure itself is left uncolored. "Till Day" is the selected day's cumulative total so far, compared the same way against the previous day's total through that same point. Rows with no spend and no orders are dimmed.
@@ -470,12 +469,12 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
         </section>
         <section class="panel" id="mvPanel-month">
           <div class="panel-head"><div><div class="panel-title">Month by month</div></div></div>
-          <div class="table-scroll"><div class="table-scroll-body"><table id="monthTable"><thead><tr id="monthTableHead"></tr></thead><tbody id="monthTableBody"></tbody></table></div></div>
+          <div class="table-scroll-body"><table id="monthTable"><thead><tr id="monthTableHead"></tr></thead><tbody id="monthTableBody"></tbody></table></div>
           <div class="foot-note"><b>Reading this table:</b> Revenue (1 Day) and Revenue (7 Days) are Meta's own reported conversion value under 1-day-click and 7-day-click attribution windows respectively; ROAS is that revenue &divide; Meta spend. Google Revenue is Google's own reported conversion value; where a given month's Google export didn't include it, that month (and any Quarterly/FY total that depends on it) shows &mdash; rather than a number that's silently missing Google's share. ASR (ad-spend ratio) is (Meta + Google spend) &divide; Shopify net sales for that period &mdash; unaffected by Google Revenue, which is shown for reference only. A row tagged <span class="mv-till-tag">till DD/MM/YY</span> is still in progress through that date, not a complete period &mdash; any Quarterly/FY row that includes one is itself only partial too, understating that period's true total. The small figure next to each number is that metric's change vs. the prior month (MoM): green/up is favorable and red/down is unfavorable for that metric &mdash; spend and ASR are colored inverted (a rise is unfavorable), revenue and ROAS are colored normally (a rise is favorable). ASR's delta is shown as a percentage-point difference, not a relative percent. Google Revenue is shown as reported by Google &mdash; it's known to run inflated versus Shopify's numbers, which is why ASR and all "exact" reporting are based on Shopify net sales instead.</div>
         </section>
         <section class="panel" id="mvPanel-day">
           <div class="panel-head"><div><div class="panel-title">Day by day (Sep 2026 onward)</div><div class="panel-sub">Same columns as Month by month, one row per day, built from the same Meta/Google/Shopify files as the Hourly &amp; Daily Trend tabs. The small figure next to each number is its change vs. the prior day (DoD).</div></div></div>
-          <div class="table-scroll"><div class="table-scroll-body"><table id="dayTable"><thead><tr id="dayTableHead"></tr></thead><tbody id="dayTableBody"></tbody></table></div></div>
+          <div class="table-scroll-body"><table id="dayTable"><thead><tr id="dayTableHead"></tr></thead><tbody id="dayTableBody"></tbody></table></div>
           <div class="foot-note" id="dayTableEmptyNote" style="display:none;">No day-level source files found yet for this window. Once Meta/Google/Shopify files covering Sep 2026 onward are in the folder, this table fills in automatically on the next refresh &mdash; no filename or code change needed.</div>
         </section>
       </section>
@@ -495,10 +494,8 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
             </div>
           </div>
           <div class="metric-select" id="ascMetricSelect"></div>
-          <div class="table-scroll">
-            <div class="table-scroll-body">
-              <table id="ascTable"><thead><tr id="ascTableHead"></tr></thead><tbody id="ascTableBody"></tbody></table>
-            </div>
+          <div class="table-scroll-body">
+            <table id="ascTable"><thead><tr id="ascTableHead"></tr></thead><tbody id="ascTableBody"></tbody></table>
           </div>
           <div class="foot-note" id="ascEmptyNote" style="display:none;">No ASC campaign data found yet. Drop a "Camp_upd-*.xlsx" Meta export (Campaign name &times; Day, with Impressions/Link clicks/Landing page views/Purchases) into the folder and this view fills in on the next refresh.</div>
           <div class="foot-note">
@@ -516,14 +513,12 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
               <div class="panel-sub">Current daily budget (live from Meta) alongside recent spend and revenue for every Advantage+ Shopping Campaign.</div>
             </div>
           </div>
-          <div class="table-scroll">
-            <div class="table-scroll-body">
-              <table id="budgetTable1"><thead><tr>
-                <th class="txt">ASC</th><th>Budget</th>
-                <th>L3D Spends</th><th>L3D Revenue</th><th>L3D ROAS</th>
-                <th>L7D Spends</th><th>L7D Revenue</th><th>L7D ROAS</th>
-              </tr></thead><tbody id="budgetTable1Body"></tbody></table>
-            </div>
+          <div class="table-scroll-body">
+            <table id="budgetTable1"><thead><tr>
+              <th class="txt" data-key="label">ASC</th><th data-key="budget">Budget</th>
+              <th data-key="l3d_spend">L3D Spends</th><th data-key="l3d_rev">L3D Revenue</th><th data-key="l3d_roas">L3D ROAS</th>
+              <th data-key="l7d_spend">L7D Spends</th><th data-key="l7d_rev">L7D Revenue</th><th data-key="l7d_roas">L7D ROAS</th>
+            </tr></thead><tbody id="budgetTable1Body"></tbody></table>
           </div>
           <div class="foot-note" id="budgetFetchedNote"></div>
         </section>
@@ -539,12 +534,10 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
               <datalist id="budgetSelectList"></datalist>
             </div>
           </div>
-          <div class="table-scroll">
-            <div class="table-scroll-body">
-              <table id="budgetTable2"><thead><tr>
-                <th class="txt">Date</th><th>Spends</th><th>Revenue</th><th>ROAS</th><th>Budget</th>
-              </tr></thead><tbody id="budgetTable2Body"></tbody></table>
-            </div>
+          <div class="table-scroll-body">
+            <table id="budgetTable2"><thead><tr>
+              <th class="txt" data-key="date">Date</th><th data-key="spend">Spends</th><th data-key="rev">Revenue</th><th data-key="roas">ROAS</th><th data-key="budget">Budget</th>
+            </tr></thead><tbody id="budgetTable2Body"></tbody></table>
           </div>
           <div class="foot-note" id="budgetEmptyNote" style="display:none;">No budget data found yet. Budget snapshots are pulled from the Meta Ads API when the dashboard is refreshed.</div>
           <div class="foot-note">
@@ -1660,6 +1653,55 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   }
 
   // ---------- ASC View ----------
+  // ---------- generic click-to-sort for table headers with data-key ----------
+  // `state` is a small {key, dir} object the caller owns and keeps around between
+  // re-renders so the chosen sort survives filter/metric changes. Clicking a header
+  // toggles asc/desc on repeat clicks (like the Hourly Detail table above); clicking
+  // a different header starts it ascending.
+  function enableColumnSort(theadEl, state, onSort) {
+    function updateArrows() {
+      Array.prototype.forEach.call(theadEl.querySelectorAll('th[data-key]'), function(th) {
+        var active = th.dataset.key === state.key;
+        th.classList.toggle('sorted', active);
+        var arrow = th.querySelector('.arrow');
+        if (arrow) arrow.textContent = active ? (state.dir === 1 ? '↑' : '↓') : '↕';
+      });
+    }
+    Array.prototype.forEach.call(theadEl.querySelectorAll('th[data-key]'), function(th) {
+      if (!th.querySelector('.arrow')) th.innerHTML += '<span class="arrow">↕</span>';
+      th.tabIndex = 0;
+      th.setAttribute('role', 'button');
+      th.setAttribute('aria-label', 'Sort by ' + th.textContent.replace('↕','').replace('↑','').replace('↓','').trim());
+      if (th.dataset.sortBound) return;
+      th.dataset.sortBound = '1';
+      function doSort() {
+        var key = th.dataset.key;
+        if (state.key === key) state.dir *= -1; else { state.key = key; state.dir = 1; }
+        updateArrows();
+        onSort();
+      }
+      th.addEventListener('click', doSort);
+      th.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); doSort(); }
+      });
+    });
+    updateArrows();
+  }
+
+  function sortRows(rows, state, getValue) {
+    if (!state.key) return rows;
+    var sorted = rows.slice();
+    sorted.sort(function(a, b) {
+      var av = getValue(a, state.key), bv = getValue(b, state.key);
+      if (av === null || av === undefined || (typeof av === 'number' && isNaN(av))) return bv == null ? 0 : 1;
+      if (bv === null || bv === undefined || (typeof bv === 'number' && isNaN(bv))) return -1;
+      if (av < bv) return -1 * state.dir;
+      if (av > bv) return 1 * state.dir;
+      return 0;
+    });
+    return sorted;
+  }
+
   function renderAscView() {
     var av = DATA.asc_view;
     var emptyNote = document.getElementById('ascEmptyNote');
@@ -1745,6 +1787,8 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       };
     }
 
+    var ascSortState = { key: null, dir: 1 };
+
     function renderAscTable() {
       var selectedLabel = ascSelectEl.value || (av.campaigns[0] && av.campaigns[0].label);
       var camp = av.campaigns.filter(function(c) { return c.label === selectedLabel; })[0];
@@ -1753,19 +1797,38 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
 
       var headEl = document.getElementById('ascTableHead');
       var bodyEl = document.getElementById('ascTableBody');
-      headEl.innerHTML = '<th class="txt">Date</th>' + activeMetrics.map(function(m) {
-        return '<th>' + m.label + '</th>';
+      headEl.innerHTML = '<th class="txt" data-key="date">Date</th>' + activeMetrics.map(function(m) {
+        return '<th data-key="' + m.key + '">' + m.label + '</th>';
       }).join('');
+
+      // A metric that got unchecked (or the initial load) shouldn't leave a stale
+      // sort pinned to a column that's no longer showing.
+      var validKeys = ['date'].concat(activeMetrics.map(function(m) { return m.key; }));
+      if (ascSortState.key && validKeys.indexOf(ascSortState.key) === -1) {
+        ascSortState.key = null; ascSortState.dir = 1;
+      }
 
       if (!camp) { bodyEl.innerHTML = ''; return; }
 
-      bodyEl.innerHTML = av.days.map(function(day) {
-        var row = computeRow(camp.by_day[day]);
-        var cells = activeMetrics.map(function(m) {
-          return '<td class="num">' + m.fmt(row ? row[m.key] : null) + '</td>';
+      var dayItems = av.days.map(function(day) {
+        return { day: day, row: computeRow(camp.by_day[day]) };
+      });
+
+      function renderBody() {
+        var items = sortRows(dayItems, ascSortState, function(item, key) {
+          return key === 'date' ? item.day : (item.row ? item.row[key] : null);
+        });
+        bodyEl.innerHTML = items.map(function(item) {
+          var row = item.row;
+          var cells = activeMetrics.map(function(m) {
+            return '<td class="num">' + m.fmt(row ? row[m.key] : null) + '</td>';
+          }).join('');
+          return '<tr' + (row ? '' : ' class="zero"') + '><td class="txt">' + dayNum(item.day) + '</td>' + cells + '</tr>';
         }).join('');
-        return '<tr' + (row ? '' : ' class="zero"') + '><td class="txt">' + dayNum(day) + '</td>' + cells + '</tr>';
-      }).join('');
+      }
+
+      enableColumnSort(headEl, ascSortState, renderBody);
+      renderBody();
     }
 
     renderAscTable();
@@ -1791,18 +1854,25 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     }
 
     // Table 1 -- one row per ASC, no filter
-    document.getElementById('budgetTable1Body').innerHTML = bv.table1.map(function(r) {
-      return '<tr>' +
-        '<td class="txt">' + r.label + '</td>' +
-        '<td class="num">' + fmtBudget(r.budget) + '</td>' +
-        '<td class="num">' + fmtMoney(r.l3d_spend) + '</td>' +
-        '<td class="num">' + fmtMoney(r.l3d_rev) + '</td>' +
-        '<td class="num">' + fmtRoas(r.l3d_roas) + '</td>' +
-        '<td class="num">' + fmtMoney(r.l7d_spend) + '</td>' +
-        '<td class="num">' + fmtMoney(r.l7d_rev) + '</td>' +
-        '<td class="num">' + fmtRoas(r.l7d_roas) + '</td>' +
-        '</tr>';
-    }).join('');
+    var table1SortState = { key: null, dir: 1 };
+    function renderBudgetTable1() {
+      var rows = sortRows(bv.table1, table1SortState, function(r, key) { return r[key]; });
+      document.getElementById('budgetTable1Body').innerHTML = rows.map(function(r) {
+        return '<tr>' +
+          '<td class="txt">' + r.label + '</td>' +
+          '<td class="num">' + fmtBudget(r.budget) + '</td>' +
+          '<td class="num">' + fmtMoney(r.l3d_spend) + '</td>' +
+          '<td class="num">' + fmtMoney(r.l3d_rev) + '</td>' +
+          '<td class="num">' + fmtRoas(r.l3d_roas) + '</td>' +
+          '<td class="num">' + fmtMoney(r.l7d_spend) + '</td>' +
+          '<td class="num">' + fmtMoney(r.l7d_rev) + '</td>' +
+          '<td class="num">' + fmtRoas(r.l7d_roas) + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+    var budgetTable1HeadEl = document.querySelector('#budgetTable1 thead tr');
+    if (budgetTable1HeadEl) enableColumnSort(budgetTable1HeadEl, table1SortState, renderBudgetTable1);
+    renderBudgetTable1();
 
     // Table 2 -- filtered to one ASC, last 7 days
     var budgetSelectEl = document.getElementById('budgetSelect');
@@ -1830,11 +1900,16 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       });
     }
 
+    var table2SortState = { key: null, dir: 1 };
+    var budgetTable2HeadEl = document.querySelector('#budgetTable2 thead tr');
+    if (budgetTable2HeadEl) enableColumnSort(budgetTable2HeadEl, table2SortState, renderBudgetTable2);
+
     function renderBudgetTable2() {
       var label = budgetSelectEl.value || (bv.table1[0] && bv.table1[0].label);
-      var rows = bv.table2[label];
+      var rawRows = bv.table2[label];
       var bodyEl = document.getElementById('budgetTable2Body');
-      if (!rows) { bodyEl.innerHTML = ''; return; }
+      if (!rawRows) { bodyEl.innerHTML = ''; return; }
+      var rows = sortRows(rawRows, table2SortState, function(r, key) { return r[key]; });
       bodyEl.innerHTML = rows.map(function(row) {
         return '<tr' + (row.spend ? '' : ' class="zero"') + '>' +
           '<td class="txt">' + dayNum(row.date) + '</td>' +
