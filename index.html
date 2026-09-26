@@ -489,7 +489,8 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
             </div>
             <div class="control-group">
               <span class="control-label">ASC</span>
-              <select class="daysel" id="ascSelect" style="min-width:260px;"></select>
+              <input class="daysel" id="ascSelect" list="ascSelectList" autocomplete="off" placeholder="Search ASC…" style="min-width:260px;">
+              <datalist id="ascSelectList"></datalist>
             </div>
           </div>
           <div class="metric-select" id="ascMetricSelect"></div>
@@ -1626,23 +1627,27 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       { key: 'rev', label: 'ASC Rev', fmt: function(v){ return v == null ? '—' : '₹' + Math.round(v / 1000) + 'K'; } },
       { key: 'spend', label: 'ASC Spends', fmt: function(v){ return v == null ? '—' : '₹' + Math.round(v / 1000) + 'K'; } },
       { key: 'cpm', label: 'CPM', fmt: function(v){ return v == null ? '—' : '₹' + Math.round(v); } },
-      { key: 'ctr', label: 'CTR', fmt: function(v){ return v == null ? '—' : Math.round(v) + '%'; } },
+      { key: 'ctr', label: 'CTR', fmt: function(v){ return v == null ? '—' : v.toFixed(2) + '%'; } },
       { key: 'lpv_rate', label: 'LPV', fmt: function(v){ return v == null ? '—' : Math.round(v) + '%'; } },
-      { key: 'cvr', label: 'CVR', fmt: function(v){ return v == null ? '—' : Math.round(v) + '%'; } },
+      { key: 'cvr', label: 'CVR', fmt: function(v){ return v == null ? '—' : v.toFixed(2) + '%'; } },
       { key: 'aov', label: 'AOV', fmt: function(v){ return v == null ? '—' : fmtINR(v); } },
     ];
 
-    // ASC dropdown (built once)
+    // ASC search box (built once) -- text input + datalist so it's searchable
     var ascSelectEl = document.getElementById('ascSelect');
+    var ascListEl = document.getElementById('ascSelectList');
     if (ascSelectEl && !ascSelectEl.dataset.built) {
       ascSelectEl.dataset.built = '1';
       av.campaigns.forEach(function(c) {
         var opt = document.createElement('option');
         opt.value = c.label;
-        opt.textContent = c.label;
-        ascSelectEl.appendChild(opt);
+        ascListEl.appendChild(opt);
       });
-      ascSelectEl.addEventListener('change', renderAscTable);
+      ascSelectEl.value = av.campaigns[0] ? av.campaigns[0].label : '';
+      ascSelectEl.addEventListener('input', function() {
+        var match = av.campaigns.filter(function(c) { return c.label === ascSelectEl.value; })[0];
+        if (match) renderAscTable();
+      });
     }
 
     // Metric checkboxes (built once, all on by default)
@@ -1686,6 +1691,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     function renderAscTable() {
       var selectedLabel = ascSelectEl.value || (av.campaigns[0] && av.campaigns[0].label);
       var camp = av.campaigns.filter(function(c) { return c.label === selectedLabel; })[0];
+      if (!camp && av.campaigns[0]) camp = av.campaigns[0];
       var activeMetrics = ASC_METRICS.filter(function(m) { return ascMetricState[m.key]; });
 
       var headEl = document.getElementById('ascTableHead');
