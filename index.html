@@ -391,11 +391,11 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
             <div class="controls-row">
               <div class="control-group">
                 <span class="control-label">Date</span>
-                <select class="daysel" id="hhDateSelect"></select>
+                <input type="date" class="daysel" id="hhDateSelect">
               </div>
               <div class="control-group">
                 <span class="control-label">Compare to</span>
-                <select class="daysel" id="hhCompareSelect"></select>
+                <input type="date" class="daysel" id="hhCompareSelect">
               </div>
             </div>
           </div>
@@ -424,7 +424,6 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
               <tbody id="tableBody"></tbody>
             </table>
           </div>
-          </div>
           <div class="foot-note">
             <b>Reading this table:</b> Meta ROAS is Meta's own reported purchase conversion value &divide; Meta spend for that hour &mdash; a Meta-attributed view, distinct from the blended ROAS shown elsewhere. ASR (ad-spend ratio) is (Meta + Google spend) &divide; net sales (=Revenue) for that hour &mdash; the inverse view, on a net-of-returns basis. The small +/&minus; figures next to Meta, Total spend and Revenue compare each hour to the <i>same</i> hour on the previous day (apples to apples), not the hour before it. Revenue's chip is green when up, red when down; Meta and Total spend are a cost, so their chips run the opposite way &mdash; green when spend is <i>down</i>, red when it's up. ASR's small figure is different: rather than a % change, it's the previous day's ASR at that same point &mdash; the same hour, or for "Till Day," the same cumulative-to-hour window &mdash; shown as a value so it's directly comparable. The color lives on the main ASR figure, not that reference figure: green means it's the lower (better) of the two, red means higher; the reference figure itself is left uncolored. "Till Day" is the selected day's cumulative total so far, compared the same way against the previous day's total through that same point. Rows with no spend and no orders are dimmed.
           </div>
@@ -439,10 +438,20 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
           <div class="panel-head">
             <div>
               <div class="panel-title">Revenue trend</div>
-              <div class="panel-sub">Daily net sales across the full range &mdash; hover a bar for its numbers, click to hold the popup in place, double-click anywhere outside it to release.</div>
+              <div class="panel-sub" id="overviewRangeSub">Daily net sales across the full range &mdash; hover a bar for its numbers, click to hold the popup in place, double-click anywhere outside it to release.</div>
             </div>
-            <div class="legend">
-              <span><i style="background:var(--moss)"></i>Revenue</span>
+            <div class="controls-row">
+              <div class="control-group">
+                <span class="control-label">From</span>
+                <input type="date" class="daysel" id="overviewFromSelect">
+              </div>
+              <div class="control-group">
+                <span class="control-label">To</span>
+                <input type="date" class="daysel" id="overviewToSelect">
+              </div>
+              <div class="legend">
+                <span><i style="background:var(--moss)"></i>Revenue</span>
+              </div>
             </div>
           </div>
           <div class="chart-scroll">
@@ -699,19 +708,39 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   });
 
   // ---------- KPIs ----------
-  var gtAsr = (gt.total_spend > 0 && gt.net_sales > 0) ? (gt.total_spend / gt.net_sales) * 100 : null;
-  var kpiDefs = [
-    { label: 'Meta spend', val: fmtINR(gt.meta_spend, {compact:true}), sub: rangeShortLabel + ' total', cls: 'accent-spend' },
-    { label: 'Revenue', val: fmtINR(gt.net_sales, {compact:true}), sub: 'net sales, ' + fmtNum(gt.orders) + ' orders', cls: 'accent-rev' },
-    { label: 'ASR', val: fmtPct(gtAsr), sub: '(Meta + Google spend) ÷ net sales', cls: 'accent-roas' }
-  ];
+  // Rebuilt from whatever date range is currently selected in the Daily Trend tab
+  // (defaults to the full loaded range) rather than only the fixed all-time total,
+  // so the custom date-range filter there updates these too.
+  function computeRangeAggregate(rows) {
+    var agg = { meta_spend: 0, google_spend: 0, total_spend: 0, orders: 0, total_sales: 0, net_sales: 0 };
+    rows.forEach(function(r) {
+      agg.meta_spend += r.meta_spend || 0;
+      agg.google_spend += r.google_spend || 0;
+      agg.total_spend += r.total_spend || 0;
+      agg.orders += r.orders || 0;
+      agg.total_sales += r.total_sales || 0;
+      agg.net_sales += r.net_sales || 0;
+    });
+    return agg;
+  }
   var kpiRow = document.getElementById('kpiRow');
-  kpiDefs.forEach(function(k) {
+  function renderKpis(rows, rangeLabel) {
+    var agg = rows.length ? computeRangeAggregate(rows) : gt;
+    var asr = (agg.total_spend > 0 && agg.net_sales > 0) ? (agg.total_spend / agg.net_sales) * 100 : null;
+    var kpiDefs = [
+      { label: 'Meta spend', val: fmtINR(agg.meta_spend, {compact:true}), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-spend' },
+      { label: 'Revenue', val: fmtINR(agg.net_sales, {compact:true}), sub: 'net sales, ' + fmtNum(agg.orders) + ' orders', cls: 'accent-rev' },
+      { label: 'ASR', val: fmtPct(asr), sub: '(Meta + Google spend) ÷ net sales', cls: 'accent-roas' }
+    ];
+    kpiRow.innerHTML = '';
+    kpiDefs.forEach(function(k) {
     var el = document.createElement('div');
     el.className = 'kpi' + (k.cls ? ' ' + k.cls : '');
     el.innerHTML = '<div class="label">' + k.label + '</div><div class="kpi-value">' + k.val + '</div><div class="sub">' + k.sub + '</div>';
     kpiRow.appendChild(el);
-  });
+    });
+  }
+  renderKpis(daily, rangeShortLabel);
 
   // ---------- tooltip ----------
   var tooltip = document.getElementById('tooltip');
@@ -758,8 +787,9 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     }
   });
 
+  var overviewDaily = daily;
   function drawMainChart() {
-    var points = daily.map(function(r) { return { rev: r.net_sales, raw: r }; });
+    var points = overviewDaily.map(function(r) { return { rev: r.net_sales, raw: r }; });
     var svg = document.getElementById('mainChart');
     var W = 1196, H = 300, padL = 54, padR = 18, padT = 16, padB = 30;
     var innerW = W - padL - padR, innerH = H - padT - padB;
@@ -821,6 +851,35 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     }
   }
 
+  // ---------- Daily Trend: custom date-range filter ----------
+  // Filters both the KPI row and the revenue-trend chart above to a From/To range;
+  // defaults to (and resets to) the full loaded range.
+  (function() {
+    var fromSel = document.getElementById('overviewFromSelect');
+    var toSel = document.getElementById('overviewToSelect');
+    var subEl = document.getElementById('overviewRangeSub');
+    if (!fromSel || !toSel) return;
+    [fromSel, toSel].forEach(function(sel) { sel.min = rangeStartDate; sel.max = rangeEndDate; });
+    fromSel.value = rangeStartDate;
+    toSel.value = rangeEndDate;
+
+    function apply() {
+      var from = fromSel.value || rangeStartDate;
+      var to = toSel.value || rangeEndDate;
+      if (from > to) { var t = from; from = to; to = t; fromSel.value = from; toSel.value = to; }
+      overviewDaily = daily.filter(function(r) { return r.date >= from && r.date <= to; });
+      var label = (from === rangeStartDate && to === rangeEndDate) ? rangeShortLabel : fmtRangeShort(from, to);
+      if (subEl) {
+        subEl.innerHTML = (overviewDaily.length ? 'Daily net sales, ' + label : 'No days in this range') +
+          ' &mdash; hover a bar for its numbers, click to hold the popup in place, double-click anywhere outside it to release.';
+      }
+      renderKpis(overviewDaily, label);
+      drawMainChart();
+    }
+    fromSel.addEventListener('change', apply);
+    toSel.addEventListener('change', apply);
+  })();
+
   // ============================================================
   // Precompute per-hour derived metrics
   // ============================================================
@@ -879,41 +938,33 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   var hhDate = days[days.length - 1];
   var defaultCompare = prevDate(hhDate);
   var hhCompare = days.indexOf(defaultCompare) >= 0 ? defaultCompare : days[Math.max(0, days.length - 2)];
-  var compareManuallySet = false;
 
+  // Calendar date pickers (native <input type="date">) instead of a scrolling list --
+  // bounded to the loaded data range so nothing outside it can be picked. Choosing a
+  // DATE always re-derives COMPARE TO as the day right before it (that's the point of
+  // this panel -- apples-to-apples, day-on-day); COMPARE TO can still be moved
+  // independently afterwards (e.g. to compare against the same day last week), but the
+  // next DATE change snaps it back to "day before" again rather than leaving it stuck.
   var hhDateSelect = document.getElementById('hhDateSelect');
   var hhCompareSelect = document.getElementById('hhCompareSelect');
   [hhDateSelect, hhCompareSelect].forEach(function(sel) {
-    days.forEach(function(d) {
-      var opt = document.createElement('option');
-      opt.value = d; opt.textContent = dayLabel(d);
-      sel.appendChild(opt);
-    });
+    sel.min = rangeStartDate; sel.max = rangeEndDate;
   });
   hhDateSelect.value = hhDate; hhCompareSelect.value = hhCompare;
 
-  // Neither picker may land on the day currently chosen in the other one —
-  // disable that option so the same day can't be compared against itself.
-  function syncSelectExclusions() {
-    Array.prototype.forEach.call(hhDateSelect.options, function(opt) { opt.disabled = (opt.value === hhCompare); });
-    Array.prototype.forEach.call(hhCompareSelect.options, function(opt) { opt.disabled = (opt.value === hhDate); });
-  }
-  syncSelectExclusions();
-
   hhDateSelect.addEventListener('change', function() {
-    hhDate = this.value;
-    if (!compareManuallySet) {
-      var pd = prevDate(hhDate);
-      hhCompare = (days.indexOf(pd) >= 0 && pd !== hhDate) ? pd : hhCompare;
-      hhCompareSelect.value = hhCompare;
-    }
-    syncSelectExclusions();
+    var v = this.value;
+    if (!v || days.indexOf(v) < 0) { this.value = hhDate; return; }
+    hhDate = v;
+    var pd = prevDate(hhDate);
+    hhCompare = (days.indexOf(pd) >= 0) ? pd : hhCompare;
+    hhCompareSelect.value = hhCompare;
     renderMetricChart();
   });
   hhCompareSelect.addEventListener('change', function() {
-    hhCompare = this.value;
-    compareManuallySet = true;
-    syncSelectExclusions();
+    var v = this.value;
+    if (!v || days.indexOf(v) < 0 || v === hhDate) { this.value = hhCompare; return; }
+    hhCompare = v;
     renderMetricChart();
   });
 
