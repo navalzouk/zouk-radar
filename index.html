@@ -424,9 +424,6 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
               <tbody id="tableBody"></tbody>
             </table>
           </div>
-          <div class="foot-note">
-            <b>Reading this table:</b> Meta ROAS is Meta's own reported purchase conversion value &divide; Meta spend for that hour &mdash; a Meta-attributed view, distinct from the blended ROAS shown elsewhere. ASR (ad-spend ratio) is (Meta + Google spend) &divide; net sales (=Revenue) for that hour &mdash; the inverse view, on a net-of-returns basis. The small +/&minus; figures next to Meta, Total spend and Revenue compare each hour to the <i>same</i> hour on the previous day (apples to apples), not the hour before it. Revenue's chip is green when up, red when down; Meta and Total spend are a cost, so their chips run the opposite way &mdash; green when spend is <i>down</i>, red when it's up. ASR's small figure is different: rather than a % change, it's the previous day's ASR at that same point &mdash; the same hour, or for "Till Day," the same cumulative-to-hour window &mdash; shown as a value so it's directly comparable. The color lives on the main ASR figure, not that reference figure: green means it's the lower (better) of the two, red means higher; the reference figure itself is left uncolored. "Till Day" is the selected day's cumulative total so far, compared the same way against the previous day's total through that same point. Rows with no spend and no orders are dimmed.
-          </div>
         </section>
       </section>
 
@@ -852,16 +849,26 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   }
 
   // ---------- Daily Trend: custom date-range filter ----------
-  // Filters both the KPI row and the revenue-trend chart above to a From/To range;
-  // defaults to (and resets to) the full loaded range.
+  // Filters both the KPI row and the revenue-trend chart above to a From/To range.
+  // Defaults to the current month through yesterday (not the full loaded range) --
+  // "yesterday" here means the day before the dataset's latest day, same definition
+  // used everywhere else in the dashboard -- clamped into the loaded range at both ends.
   (function() {
     var fromSel = document.getElementById('overviewFromSelect');
     var toSel = document.getElementById('overviewToSelect');
     var subEl = document.getElementById('overviewRangeSub');
     if (!fromSel || !toSel) return;
     [fromSel, toSel].forEach(function(sel) { sel.min = rangeStartDate; sel.max = rangeEndDate; });
-    fromSel.value = rangeStartDate;
-    toSel.value = rangeEndDate;
+
+    var endParts = rangeEndDate.split('-');
+    var monthStart = endParts[0] + '-' + endParts[1] + '-01';
+    var defaultFrom = monthStart > rangeStartDate ? monthStart : rangeStartDate;
+    var defaultTo = prevDate(rangeEndDate);
+    if (defaultTo < rangeStartDate) defaultTo = rangeStartDate;
+    if (defaultTo > rangeEndDate) defaultTo = rangeEndDate;
+    if (defaultFrom > defaultTo) defaultFrom = defaultTo;
+    fromSel.value = defaultFrom;
+    toSel.value = defaultTo;
 
     function apply() {
       var from = fromSel.value || rangeStartDate;
@@ -878,6 +885,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     }
     fromSel.addEventListener('change', apply);
     toSel.addEventListener('change', apply);
+    apply();
   })();
 
   // ============================================================
