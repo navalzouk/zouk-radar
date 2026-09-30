@@ -163,6 +163,15 @@ main.content { flex: 1 1 auto; overflow-y: auto; position: relative; }
 }
 .kpi-value { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
 .kpi .sub { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
+.kpi.clickable { cursor: pointer; transition: background .12s; }
+.kpi.clickable:hover { background: var(--surface-2, var(--bg)); }
+.kpi.clickable:focus-visible { outline: 2px solid var(--petrol); outline-offset: -2px; }
+.kpi.selected { box-shadow: inset 0 -3px 0 currentColor; background: var(--surface-2, var(--bg)); }
+.kpi.accent-spend.selected { color: var(--clay); }
+.kpi.accent-rev.selected { color: var(--moss); }
+.kpi.accent-roas.selected { color: var(--petrol); }
+.kpi.selected .label, .kpi.selected .sub { color: var(--text-dim); }
+.kpi.selected .label::after { content: ' \2022 shown in chart'; text-transform: none; letter-spacing: 0; font-weight: 500; }
 .kpi.accent-spend .kpi-value { color: var(--clay); }
 .kpi.accent-rev .kpi-value { color: var(--moss); }
 .kpi.accent-roas .kpi-value { color: var(--petrol); }
@@ -434,7 +443,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
         <section class="panel">
           <div class="panel-head">
             <div>
-              <div class="panel-title">Revenue &amp; Google Spend trend</div>
+              <div class="panel-title" id="overviewTitle">Revenue &amp; Google Spend trend</div>
               <div class="panel-sub" id="overviewRangeSub">Daily net sales (bars, left axis) and Google spend (line, right axis) across the full range &mdash; hover a bar for its numbers, click to hold the popup in place, double-click anywhere outside it to release.</div>
             </div>
             <div class="controls-row">
@@ -447,8 +456,8 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
                 <input type="date" class="daysel" id="overviewToSelect">
               </div>
               <div class="legend">
-                <span><i style="background:var(--moss)"></i>Revenue</span>
-                <span><i style="background:var(--brass)"></i>Google Spend</span>
+                <span id="overviewLegend"><span><i style="background:var(--moss)"></i>Revenue</span>
+                <span><i style="background:var(--brass)"></i>Google Spend</span></span>
               </div>
             </div>
           </div>
@@ -722,21 +731,47 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     return agg;
   }
   var kpiRow = document.getElementById('kpiRow');
+  // The six KPI cards double as the Daily Trend chart's metric selector.
+  var asrOf = function(r) { return (r.net_sales > 0) ? (r.total_spend / r.net_sales) * 100 : null; };
+  var OV_METRICS = {
+    meta_spend:   { label: 'Meta spend',   get: function(r){ return r.meta_spend; },   axis: function(v){ return fmtINR(v, {compact:true}); }, color: 'var(--clay)' },
+    google_spend: { label: 'Google spend', get: function(r){ return r.google_spend; }, axis: function(v){ return fmtINR(v, {compact:true}); }, color: 'var(--brass)' },
+    total_spend:  { label: 'Total spend',  get: function(r){ return r.total_spend; },  axis: function(v){ return fmtINR(v, {compact:true}); }, color: 'var(--clay)' },
+    net_sales:    { label: 'Revenue',      get: function(r){ return r.net_sales; },    axis: function(v){ return fmtINR(v, {compact:true}); }, color: 'var(--moss)' },
+    asr:          { label: 'ASR',          get: asrOf,                                  axis: function(v){ return v.toFixed(1) + '%'; },        color: 'var(--petrol)' },
+    orders:       { label: 'Orders',       get: function(r){ return r.orders; },       axis: function(v){ return fmtNum(v); },                  color: 'var(--moss)' }
+  };
+  var overviewMetric = 'net_sales';
+  var lastKpiRows = null, lastKpiLabel = null;
   function renderKpis(rows, rangeLabel) {
+    lastKpiRows = rows; lastKpiLabel = rangeLabel;
     var agg = rows.length ? computeRangeAggregate(rows) : gt;
     var asr = (agg.total_spend > 0 && agg.net_sales > 0) ? (agg.total_spend / agg.net_sales) * 100 : null;
     var kpiDefs = [
-      { label: 'Meta spend', val: fmtINR(agg.meta_spend, {compact:true}), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-spend' },
-      { label: 'Google spend', val: fmtINR(agg.google_spend, {compact:true}), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-spend' },
-      { label: 'Total spend', val: fmtINR(agg.total_spend, {compact:true}), sub: 'Meta + Google, ' + (rangeLabel || rangeShortLabel), cls: 'accent-spend' },
-      { label: 'Revenue', val: fmtINR(agg.net_sales, {compact:true}), sub: 'net sales, ' + fmtNum(agg.orders) + ' orders', cls: 'accent-rev' },
-      { label: 'ASR', val: fmtPct(asr), sub: '(Meta + Google spend) ÷ net sales', cls: 'accent-roas' },
-      { label: 'Orders', val: fmtNum(agg.orders), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-rev' }
+      { key: 'meta_spend', label: 'Meta spend', val: fmtINR(agg.meta_spend, {compact:true}), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-spend' },
+      { key: 'google_spend', label: 'Google spend', val: fmtINR(agg.google_spend, {compact:true}), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-spend' },
+      { key: 'total_spend', label: 'Total spend', val: fmtINR(agg.total_spend, {compact:true}), sub: 'Meta + Google, ' + (rangeLabel || rangeShortLabel), cls: 'accent-spend' },
+      { key: 'net_sales', label: 'Revenue', val: fmtINR(agg.net_sales, {compact:true}), sub: 'net sales, ' + fmtNum(agg.orders) + ' orders', cls: 'accent-rev' },
+      { key: 'asr', label: 'ASR', val: fmtPct(asr), sub: '(Meta + Google spend) ÷ net sales', cls: 'accent-roas' },
+      { key: 'orders', label: 'Orders', val: fmtNum(agg.orders), sub: (rangeLabel || rangeShortLabel) + ' total', cls: 'accent-rev' }
     ];
     kpiRow.innerHTML = '';
     kpiDefs.forEach(function(k) {
     var el = document.createElement('div');
-    el.className = 'kpi' + (k.cls ? ' ' + k.cls : '');
+    el.className = 'kpi clickable' + (k.cls ? ' ' + k.cls : '') + (k.key === overviewMetric ? ' selected' : '');
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-pressed', k.key === overviewMetric ? 'true' : 'false');
+    el.setAttribute('aria-label', 'Show ' + k.label + ' in the daily trend chart');
+    var pick = function() {
+      if (overviewMetric === k.key) return;
+      overviewMetric = k.key;
+      renderKpis(lastKpiRows, lastKpiLabel);
+      updateOverviewHeader();
+      drawMainChart();
+    };
+    el.addEventListener('click', pick);
+    el.addEventListener('keydown', function(ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
     el.innerHTML = '<div class="label">' + k.label + '</div><div class="kpi-value">' + k.val + '</div><div class="sub">' + k.sub + '</div>';
     kpiRow.appendChild(el);
     });
@@ -775,10 +810,12 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   var mainPinnedBar = null;
   function mainTooltipHtml(r) {
     return '<div class="t-title">' + dayLabel(r.date) + '</div>' +
-      '<div class="t-row"><span class="k">Revenue</span><span>' + fmtINR(r.net_sales) + '</span></div>' +
-      '<div class="t-row"><span class="k">Meta spend</span><span>' + fmtINR(r.meta_spend) + '</span></div>' +
-      '<div class="t-row"><span class="k">Google spend</span><span>' + fmtINR(r.google_spend) + '</span></div>' +
-      '<div class="t-row"><span class="k">Cumulative ASR</span><span>' + fmtPct(r._cum_asr_to_date) + '</span></div>';
+      ['net_sales', 'meta_spend', 'google_spend', 'total_spend', 'asr', 'orders'].map(function(key) {
+        var m = OV_METRICS[key], v = m.get(r);
+        var txt = key === 'asr' ? fmtPct(v) : (key === 'orders' ? fmtNum(v) : fmtINR(v));
+        var cur = key === overviewMetric ? ' style="font-weight:700"' : '';
+        return '<div class="t-row"' + cur + '><span class="k">' + m.label + '</span><span>' + txt + '</span></div>';
+      }).join('');
   }
   document.addEventListener('dblclick', function(ev) {
     if (mainPinned && !tooltip.contains(ev.target)) {
@@ -791,9 +828,11 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
 
   var overviewDaily = daily;
   function drawMainChart() {
-    var points = overviewDaily.map(function(r) { return { rev: r.net_sales, raw: r }; });
+    var M = OV_METRICS[overviewMetric];
+    var showGoogleLine = (overviewMetric === 'net_sales');
+    var points = overviewDaily.map(function(r) { var v = M.get(r); return { rev: (v == null ? 0 : v), raw: r }; });
     var svg = document.getElementById('mainChart');
-    var W = 1196, H = 300, padL = 54, padR = 54, padT = 16, padB = 30;
+    var W = 1196, H = 300, padL = 54, padR = showGoogleLine ? 54 : 18, padT = 16, padB = 30;
     var innerW = W - padL - padR, innerH = H - padT - padB;
     svg.setAttribute('width', W); svg.setAttribute('height', H);
     svg.innerHTML = '';
@@ -816,12 +855,14 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       var val = (maxY/4)*t, gy = y(val);
       svg.appendChild(svgEl('line', {x1:padL, x2:W-padR, y1:gy, y2:gy, class:'gridline'}));
       var lbl = svgEl('text', {x: padL - 8, y: gy + 3, class:'axis-label', 'text-anchor':'end'});
-      lbl.textContent = fmtINR(val, {compact:true});
+      lbl.textContent = M.axis(val);
       svg.appendChild(lbl);
-      var val2 = (maxY2/4)*t;
-      var lbl2 = svgEl('text', {x: W - padR + 8, y: gy + 3, class:'axis-label', fill:'var(--brass)', 'text-anchor':'start'});
-      lbl2.textContent = fmtINR(val2, {compact:true});
-      svg.appendChild(lbl2);
+      if (showGoogleLine) {
+        var val2 = (maxY2/4)*t;
+        var lbl2 = svgEl('text', {x: W - padR + 8, y: gy + 3, class:'axis-label', fill:'var(--brass)', 'text-anchor':'start'});
+        lbl2.textContent = fmtINR(val2, {compact:true});
+        svg.appendChild(lbl2);
+      }
     }
 
     for (var i = 0; i < n; i++) {
@@ -835,7 +876,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       (function(i) {
         var p = points[i];
         var bx = x(i) - barW/2;
-        var bar = svgEl('rect', {x:bx, y:y(p.rev), width:barW, height: Math.max(1, (padT+innerH)-y(p.rev)), fill:'var(--moss)', opacity:0.85, rx:2});
+        var bar = svgEl('rect', {x:bx, y:y(p.rev), width:barW, height: Math.max(1, (padT+innerH)-y(p.rev)), fill:M.color, opacity:0.85, rx:2});
         svg.appendChild(bar);
         var hit = svgEl('rect', {
           x: x(i) - slot/2, y: padT, width: slot, height: innerH,
@@ -863,7 +904,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
 
     // Google Spend line (right axis) -- drawn over the bars, with a small
     // dot per day so a single-point range still renders something visible.
-    var linePts = points.map(function(p, i) { return [x(i), y2(p.raw.google_spend || 0)]; });
+    var linePts = !showGoogleLine ? [] : points.map(function(p, i) { return [x(i), y2(p.raw.google_spend || 0)]; });
     if (linePts.length > 1) {
       var d = linePts.map(function(pt, i) { return (i === 0 ? 'M' : 'L') + pt[0] + ',' + pt[1]; }).join(' ');
       svg.appendChild(svgEl('path', {d: d, fill: 'none', stroke: 'var(--brass)', 'stroke-width': 2}));
@@ -871,6 +912,24 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     linePts.forEach(function(pt) {
       svg.appendChild(svgEl('circle', {cx: pt[0], cy: pt[1], r: 3, fill: 'var(--brass)'}));
     });
+  }
+
+  function updateOverviewHeader() {
+    var M = OV_METRICS[overviewMetric];
+    var t = document.getElementById('overviewTitle'), lg = document.getElementById('overviewLegend');
+    if (overviewMetric === 'net_sales') {
+      if (t) t.innerHTML = 'Revenue &amp; Google Spend trend';
+      if (lg) lg.innerHTML = '<span><i style="background:var(--moss)"></i>Revenue</span> <span><i style="background:var(--brass)"></i>Google Spend</span>';
+    } else {
+      if (t) t.textContent = M.label + ' trend';
+      if (lg) lg.innerHTML = '<span><i style="background:' + M.color + '"></i>' + M.label + '</span>';
+    }
+    var subEl = document.getElementById('overviewRangeSub');
+    if (subEl && lastKpiLabel) {
+      subEl.innerHTML = 'Daily ' + (overviewMetric === 'asr' ? 'ASR' : M.label.toLowerCase()) + ', ' + lastKpiLabel +
+        (overviewMetric === 'net_sales' ? ' (bars, left axis) with Google spend (line, right axis)' : '') +
+        ' &mdash; click any card above to switch the metric; hover a bar for all six numbers, click to hold the popup in place, double-click anywhere outside it to release.';
+    }
   }
 
   // ---------- Daily Trend: custom date-range filter ----------
@@ -904,11 +963,9 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       if (from > to) { var t = from; from = to; to = t; fromSel.value = from; toSel.value = to; }
       overviewDaily = daily.filter(function(r) { return r.date >= from && r.date <= to; });
       var label = (from === rangeStartDate && to === rangeEndDate) ? rangeShortLabel : fmtRangeShort(from, to);
-      if (subEl) {
-        subEl.innerHTML = (overviewDaily.length ? 'Daily net sales, ' + label : 'No days in this range') +
-          ' &mdash; hover a bar for its numbers, click to hold the popup in place, double-click anywhere outside it to release.';
-      }
       renderKpis(overviewDaily, label);
+      updateOverviewHeader();
+      if (subEl && !overviewDaily.length) subEl.innerHTML = 'No days in this range';
       drawMainChart();
     }
     fromSel.addEventListener('change', apply);
