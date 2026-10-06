@@ -1016,6 +1016,9 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
     // Spend metrics (Meta, Google) are a cost, not a volume metric -- less is the "good"
     // direction, so (like ASR below) their delta chips run backwards from Revenue/Sessions:
     // green when spend is DOWN, red when it's up.
+    total_spend:   { label: 'Total Spends',   color: 'var(--rose)',   get: function(r){ return r.total_spend; }, fmt: function(v){ return fmtINR(v, {compact:true}); }, fmtFull: fmtINR,
+                     invertDelta: true,
+                     daySummary: function(d){ return dailyByDate[d].total_spend; } },
     meta_spend:    { label: 'Meta Spend',     color: 'var(--petrol)', get: function(r){ return r.meta_spend; },  fmt: function(v){ return fmtINR(v, {compact:true}); }, fmtFull: fmtINR,
                      invertDelta: true,
                      daySummary: function(d){ return dailyByDate[d].meta_spend; } },
@@ -1038,7 +1041,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
                      isPercent: true,
                      daySummary: function(d){ var row = dailyByDate[d]; return (row.total_spend > 0 && row.net_sales > 0) ? (row.total_spend/row.net_sales)*100 : null; } }
   };
-  var metricOrder = ['net_sales', 'meta_spend', 'google_spend', 'sessions', 'hourly_asr'];
+  var metricOrder = ['net_sales', 'total_spend', 'meta_spend', 'google_spend', 'sessions', 'hourly_asr'];
   var activeMetric = 'net_sales';
 
   // ============================================================
@@ -1224,7 +1227,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
         for (var h = 0; h <= uptoHour; h++) { var r = rows[h]; if (r) { spend += r.total_spend; net += r.net_sales; } }
         return (spend > 0 && net > 0) ? (spend / net) * 100 : null;
       }
-      var field = { net_sales: 'net_sales', meta_spend: 'meta_spend', google_spend: 'google_spend', sessions: 'sessions' }[metricKey];
+      var field = { net_sales: 'net_sales', total_spend: 'total_spend', meta_spend: 'meta_spend', google_spend: 'google_spend', sessions: 'sessions' }[metricKey];
       var total = 0;
       for (var h2 = 0; h2 <= uptoHour; h2++) { var r2 = rows[h2]; if (r2) total += (r2[field] || 0); }
       return total;
