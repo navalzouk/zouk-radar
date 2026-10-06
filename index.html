@@ -501,12 +501,22 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
           <div class="panel-head">
             <div>
               <div class="panel-title">ASC day-on-day</div>
-              <div class="panel-sub">Pick one Advantage+ Shopping Campaign &mdash; one row per day from the ASC's first spend through the latest complete day (newest first; click Date to flip), metrics as columns.</div>
+              <div class="panel-sub">Pick one Advantage+ Shopping Campaign &mdash; one row per day in the From/To range (current month by default, newest first; click Date to flip), with a Total row on top and metrics as columns.</div>
             </div>
-            <div class="control-group">
-              <span class="control-label">ASC</span>
-              <input class="daysel" id="ascSelect" list="ascSelectList" autocomplete="off" placeholder="Search ASC…" style="min-width:260px;">
-              <datalist id="ascSelectList"></datalist>
+            <div class="controls-row">
+              <div class="control-group">
+                <span class="control-label">ASC</span>
+                <input class="daysel" id="ascSelect" list="ascSelectList" autocomplete="off" placeholder="Search ASC…" style="min-width:260px;">
+                <datalist id="ascSelectList"></datalist>
+              </div>
+              <div class="control-group">
+                <span class="control-label">From</span>
+                <input type="date" class="daysel" id="ascFromSelect">
+              </div>
+              <div class="control-group">
+                <span class="control-label">To</span>
+                <input type="date" class="daysel" id="ascToSelect">
+              </div>
             </div>
           </div>
           <div class="metric-select" id="ascMetricSelect"></div>
@@ -1914,6 +1924,21 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       });
     }
 
+    // From/To date range (built once). Defaults to the current month (month of the
+    // latest day) through the latest day, same rule as the Daily Trend filter.
+    var ascFromEl = document.getElementById('ascFromSelect');
+    var ascToEl = document.getElementById('ascToSelect');
+    if (ascFromEl && ascToEl && !ascFromEl.dataset.built) {
+      ascFromEl.dataset.built = '1';
+      var _aStart = av.days[0], _aEnd = av.days[av.days.length - 1];
+      [ascFromEl, ascToEl].forEach(function(el) { el.min = _aStart; el.max = _aEnd; });
+      var _mStart = _aEnd.slice(0, 7) + '-01';
+      ascFromEl.value = _mStart > _aStart ? _mStart : _aStart;
+      ascToEl.value = _aEnd;
+      ascFromEl.addEventListener('change', function() { renderAscTable(); });
+      ascToEl.addEventListener('change', function() { renderAscTable(); });
+    }
+
     // Metric checkboxes (built once, all on by default)
     var ascMetricSelectEl = document.getElementById('ascMetricSelect');
     var ascMetricState = {};
@@ -1979,7 +2004,10 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       // launched 11 Aug has nothing for 1-10 Aug) so the table opens on real data.
       var firstDay = null;
       av.days.forEach(function(day) { var r = camp.by_day[day]; if (firstDay === null && r && r.spend > 0) firstDay = day; });
-      var dayItems = av.days.filter(function(day) { return firstDay !== null && day >= firstDay; }).map(function(day) {
+      var rFrom = (ascFromEl && ascFromEl.value) || av.days[0];
+      var rTo = (ascToEl && ascToEl.value) || av.days[av.days.length - 1];
+      if (rFrom > rTo) { var _t = rFrom; rFrom = rTo; rTo = _t; ascFromEl.value = rFrom; ascToEl.value = rTo; }
+      var dayItems = av.days.filter(function(day) { return firstDay !== null && day >= firstDay && day >= rFrom && day <= rTo; }).map(function(day) {
         return { day: day, row: computeRow(camp.by_day[day]) };
       });
 
@@ -1987,7 +2015,21 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
         var items = sortRows(dayItems, ascSortState, function(item, key) {
           return key === 'date' ? item.day : (item.row ? item.row[key] : null);
         });
-        bodyEl.innerHTML = items.map(function(item) {
+        // Total row: sum the raw counts across the days in range, then recompute the
+        // ratios from those sums (blended ROAS/CPM/CTR/LPV/CVR/AOV, not averages of rows).
+        var tot = { spend: 0, rev_1d: 0, impressions: 0, clicks: 0, lpv: 0, purchases_1d: 0 };
+        var anyData = false;
+        items.forEach(function(item) {
+          var raw = camp.by_day[item.day];
+          if (!raw) return;
+          anyData = true;
+          Object.keys(tot).forEach(function(k) { tot[k] += raw[k] || 0; });
+        });
+        var totRow = anyData ? computeRow(tot) : null;
+        var totalHtml = items.length ? '<tr class="table-summary-row"><td class="txt">Total</td>' + activeMetrics.map(function(m) {
+          return '<td class="num">' + m.fmt(totRow ? totRow[m.key] : null) + '</td>';
+        }).join('') + '</tr>' : '';
+        bodyEl.innerHTML = totalHtml + items.map(function(item) {
           var row = item.row;
           var cells = activeMetrics.map(function(m) {
             return '<td class="num">' + m.fmt(row ? row[m.key] : null) + '</td>';
