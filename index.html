@@ -360,6 +360,16 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   .tab-btn.active::after { bottom: -11px; }
   .range-note { text-align: left; }
 }
+
+/* ---------- Excel export button ---------- */
+.export-bar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.export-btn {
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 12px; cursor: pointer;
+}
+.export-btn:hover { border-color: var(--petrol); color: var(--petrol); }
+.export-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 </style>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2174,5 +2184,194 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       renderCampChart();
     })();
   }
+  // ---------- Excel export (one button per tab, no external libraries) ----------
+  (function initExcelExport() {
+    var enc = new TextEncoder();
+    var crcTable = (function() { var t = [], c, n, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+    function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = crcTable[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''); }
+    function colName(i) { var s = ''; i++; while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+    // Turn a displayed figure ("₹5.98L", "−12.4%", "89.3K", "1,234") into a real number; anything else stays text.
+    function parseCell(t) {
+      if (typeof t === 'number') return t;
+      t = String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+      var m = t.match(/^([−\-+]?)\s*₹?\s*([\d,]*\.?\d+)\s*(Cr|L|K)?\s*(%|x|×)?$/);
+      if (!m) return t;
+      var v = parseFloat(m[2].replace(/,/g, ''));
+      if (isNaN(v)) return t;
+      if (m[3] === 'Cr') v *= 1e7; else if (m[3] === 'L') v *= 1e5; else if (m[3] === 'K') v *= 1e3;
+      return (m[1] === '−' || m[1] === '-') ? -v : v;
+    }
+    function sheetXml(rows, nHeader) {
+      var out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0">' + (nHeader ? '<pane ySplit="' + nHeader + '" topLeftCell="A' + (nHeader + 1) + '" activePane="bottomLeft" state="frozen"/>' : '') + '</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="30" customWidth="1"/><col min="2" max="40" width="16" customWidth="1"/></cols><sheetData>'];
+      rows.forEach(function(r, ri) {
+        var cells = r.map(function(v, ci) {
+          if (v === null || v === undefined || v === '') return '';
+          var ref = colName(ci) + (ri + 1);
+          var st = (ri === 0) ? ' s="2"' : (ri < nHeader ? ' s="1"' : '');
+          if (typeof v === 'number' && isFinite(v)) return '<c r="' + ref + '"' + st + '><v>' + v + '</v></c>';
+          return '<c r="' + ref + '"' + st + ' t="inlineStr"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';
+        }).join('');
+        out.push('<row r="' + (ri + 1) + '">' + cells + '</row>');
+      });
+      out.push('</sheetData></worksheet>');
+      return out.join('');
+    }
+    function buildXlsx(sheets) {
+      var files = [];
+      var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + sheets.map(function(s, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join('') + '</Types>';
+      files.push(['[Content_Types].xml', ct]);
+      files.push(['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>']);
+      files.push(['xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + sheets.map(function(s, i) { return '<sheet name="' + esc(s.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</sheets></workbook>']);
+      files.push(['xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map(function(s, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join('') + '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>']);
+      files.push(['xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAE4D6"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>']);
+      sheets.forEach(function(s, i) { files.push(['xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(s.rows, s.nHeader)]); });
+      // stored (uncompressed) zip
+      var parts = [], central = [], offset = 0;
+      files.forEach(function(f) {
+        var nameB = enc.encode(f[0]), data = enc.encode(f[1]), crc = crc32(data);
+        var lh = new DataView(new ArrayBuffer(30));
+        lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+        lh.setUint16(10, 0, true); lh.setUint16(12, 0x21, true); lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+        lh.setUint16(26, nameB.length, true); lh.setUint16(28, 0, true);
+        parts.push(new Uint8Array(lh.buffer), nameB, data);
+        var ch = new DataView(new ArrayBuffer(46));
+        ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+        ch.setUint16(12, 0, true); ch.setUint16(14, 0x21, true); ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+        ch.setUint16(28, nameB.length, true); ch.setUint32(42, offset, true);
+        central.push(new Uint8Array(ch.buffer), nameB);
+        offset += 30 + nameB.length + data.length;
+      });
+      var cdSize = central.reduce(function(a, b) { return a + b.length; }, 0);
+      var end = new DataView(new ArrayBuffer(22));
+      end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+      return new Blob(parts.concat(central, [new Uint8Array(end.buffer)]), { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+    function stamp() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+    function cleanHead(th) { return th.textContent.replace(/[↑↓↕]/g, '').replace(/\s+/g, ' ').trim(); }
+    function tableRows(tbl) {
+      var head = Array.prototype.map.call(tbl.querySelectorAll('thead th'), cleanHead);
+      if (head.length && !head[0]) head[0] = 'Period';
+      var trs = Array.prototype.slice.call(tbl.querySelectorAll('tbody tr'));
+      var chipCols = {};
+      var parsed = trs.map(function(tr) {
+        return Array.prototype.map.call(tr.children, function(td, ci) {
+          var chip = td.querySelector('.delta-chip');
+          if (!chip) return { v: parseCell(td.textContent), c: null };
+          chipCols[ci] = true;
+          var clone = td.cloneNode(true);
+          Array.prototype.forEach.call(clone.querySelectorAll('.delta-chip'), function(x) { x.parentNode.removeChild(x); });
+          return { v: parseCell(clone.textContent), c: parseCell(chip.textContent) };
+        });
+      });
+      var outHead = [], keep = [];
+      head.forEach(function(h, ci) { outHead.push(h); if (chipCols[ci]) outHead.push(h + ' (vs prev day)'); });
+      var body = parsed.map(function(cells) {
+        var row = [];
+        cells.forEach(function(c, ci) { row.push(c.v); if (chipCols[ci]) row.push(c.c); });
+        return row;
+      });
+      return [outHead].concat(body);
+    }
+    function tableSheet(name, title, tblId) {
+      var tbl = document.getElementById(tblId);
+      if (!tbl) return null;
+      var rows = tableRows(tbl);
+      if (rows.length < 2) return null;
+      return { name: name, nHeader: 2, rows: [[title]].concat(rows) };
+    }
+    function pickText(id) { var el = document.getElementById(id); return el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; }
+    function selVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+    var EXPORTS = {
+      hourbyhour: function() {
+        var a = hourlyByDate[hhDate] || [], b = hourlyByDate[hhCompare] || [];
+        var heads = ['Hour', 'Net sales', 'Total spend', 'Meta spend', 'Google spend', 'Sessions', 'Hourly ASR %'];
+        var keys = ['net_sales', 'total_spend', 'meta_spend', 'google_spend', 'sessions', '_hourly_asr'];
+        var rows = [['Hourly Trend: ' + hhDate + ' vs ' + hhCompare + ' (exported ' + stamp() + ')'],
+          ['Hour'].concat(keys.map(function(k, i) { return heads[i + 1] + ' | ' + hhDate; }), keys.map(function(k, i) { return heads[i + 1] + ' | ' + hhCompare; }))];
+        for (var h = 0; h < 24; h++) {
+          var ra = a[h], rb = b[h];
+          rows.push([h + ':00'].concat(keys.map(function(k) { return ra && ra[k] != null ? Math.round(ra[k] * 100) / 100 : null; }), keys.map(function(k) { return rb && rb[k] != null ? Math.round(rb[k] * 100) / 100 : null; })));
+        }
+        var note = DATA.meta.today === hhDate && DATA.meta.last_active_hour_today != null && DATA.meta.last_active_hour_today < 23 ? 'Note: ' + hhDate + ' is a partial day; the latest hour in the exports is partial.' : '';
+        if (note) rows.push([note]);
+        return { file: 'Hourly_Trend', sheets: [{ name: 'Hourly Trend', nHeader: 2, rows: rows }] };
+      },
+      hourlydetail: function() {
+        var s = tableSheet('Hourly Detail', 'Hourly Detail: ' + (selVal('tableDaySelect') || selectedTableDay) + ' (exported ' + stamp() + ')', 'dataTable');
+        return { file: 'Hourly_Detail', sheets: s ? [s] : [] };
+      },
+      overview: function() {
+        var heads = ['Date', 'Net sales', 'Total sales', 'Orders', 'Meta spend', 'Google spend', 'Total spend', 'Sessions', 'Conv rate %', 'ROAS', 'Cost per order'];
+        var keys = ['net_sales', 'total_sales', 'orders', 'meta_spend', 'google_spend', 'total_spend', 'sessions', 'conv_rate', 'roas', 'cost_per_order'];
+        var rows = [['Daily Trend: ' + selVal('overviewFromSelect') + ' to ' + selVal('overviewToSelect') + ' (exported ' + stamp() + ')'], heads];
+        (overviewDaily || []).forEach(function(r) {
+          rows.push([r.date].concat(keys.map(function(k) { return r[k] != null ? Math.round(r[k] * 100) / 100 : null; })));
+        });
+        return { file: 'Daily_Trend', sheets: [{ name: 'Daily Trend', nHeader: 2, rows: rows }] };
+      },
+      monthlyview: function() {
+        var s = [
+          tableSheet('Quarterly', 'Quarterly (exported ' + stamp() + ')', 'qTable'),
+          tableSheet('FY', 'Financial year (exported ' + stamp() + ')', 'fyTable'),
+          tableSheet('Month by month', 'Month by month (exported ' + stamp() + ')', 'monthTable'),
+          tableSheet('Day by day', 'Day by day (exported ' + stamp() + ')', 'dayTable')
+        ].filter(Boolean);
+        return { file: 'Monthly_View', sheets: s };
+      },
+      ascview: function() {
+        var s = tableSheet('ASC View', 'ASC View (exported ' + stamp() + ')', 'ascTable');
+        return { file: 'ASC_View', sheets: s ? [s] : [] };
+      },
+      budgetview: function() {
+        var s = [
+          tableSheet('Budget 1', 'Budget View, table 1 (exported ' + stamp() + ')', 'budgetTable1'),
+          tableSheet('Budget 2', 'Budget View, table 2 (exported ' + stamp() + ')', 'budgetTable2')
+        ].filter(Boolean);
+        return { file: 'Budget_View', sheets: s };
+      }
+    };
+
+    function flash(btn, msg) {
+      var old = btn.getAttribute('data-label') || btn.textContent;
+      btn.setAttribute('data-label', old);
+      btn.textContent = msg;
+      setTimeout(function() { btn.textContent = old; }, 2200);
+    }
+    async function saveBlob(blob, filename) {
+      var dl = null;
+      try { dl = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
+      if (dl) { await dl.save({ filename: filename, data: blob }); return; }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 4000);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.tab-panel'), function(panel) {
+      var key = panel.id.replace('tab-', '');
+      if (!EXPORTS[key]) return;
+      var bar = document.createElement('div');
+      bar.className = 'export-bar';
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'export-btn'; btn.textContent = 'Download Excel';
+      btn.addEventListener('click', async function() {
+        try {
+          var res = EXPORTS[key]();
+          if (!res.sheets.length) { flash(btn, 'Nothing to export yet'); return; }
+          var blob = buildXlsx(res.sheets);
+          await saveBlob(blob, 'Zouk_Radar_' + res.file + '_' + stamp() + '.xlsx');
+          flash(btn, 'Done');
+        } catch (e) {
+          if (e && e.code === 'declined') return;
+          flash(btn, 'Download failed');
+        }
+      });
+      bar.appendChild(btn);
+      panel.insertBefore(bar, panel.firstChild);
+    });
+  })();
+
 })();
 </script>
