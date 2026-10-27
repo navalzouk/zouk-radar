@@ -837,12 +837,31 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
   var mainPinned = false;
   var mainPinnedBar = null;
   function mainTooltipHtml(r) {
+    var hrs = hourlyByDate[r.date] || [];
+    var lastH = 23;
+    if (DATA.meta && r.date === DATA.meta.today) lastH = Math.max(0, DATA.meta.last_active_hour_today - 1);
+    var lh = hrs[lastH];
+    var lastAsr = (lh && lh.net_sales > 0) ? lh.total_spend / lh.net_sales * 100 : null;
+    var cv = 0, ms = 0;
+    hrs.forEach(function(x) { if (x) { cv += (x.meta_conv_value || 0); ms += (x.meta_spend || 0); } });
+    var asr = r.net_sales > 0 ? r.total_spend / r.net_sales * 100 : null;
+    var conv = r.sessions > 0 ? r.orders / r.sessions * 100 : null;
+    var rows = [
+      ['net_sales', 'Revenue', fmtINR(r.net_sales)],
+      ['total_spend', 'Total spends', fmtINR(r.total_spend)],
+      ['asr', 'Cumulative ASR', asr == null ? '&mdash;' : fmtPct(asr)],
+      ['last_asr', 'Last hour ASR', lastAsr == null ? '&mdash;' : fmtPct(lastAsr)],
+      ['meta_spend', 'Meta spends', fmtINR(r.meta_spend)],
+      ['google_spend', 'Google spends', fmtINR(r.google_spend)],
+      ['sessions', 'Sessions', fmtNum(r.sessions)],
+      ['conv', 'Conversion rate', conv == null ? '&mdash;' : fmtPct(conv)],
+      ['meta_roas', 'Meta ROAS', ms > 0 && cv > 0 ? fmtX(cv / ms) : '&mdash;'],
+      ['roas', 'Overall ROAS', r.total_spend > 0 ? fmtX(r.net_sales / r.total_spend) : '&mdash;']
+    ];
     return '<div class="t-title">' + dayLabel(r.date) + '</div>' +
-      ['net_sales', 'meta_spend', 'google_spend', 'total_spend', 'asr', 'orders'].map(function(key) {
-        var m = OV_METRICS[key], v = m.get(r);
-        var txt = key === 'asr' ? fmtPct(v) : (key === 'orders' ? fmtNum(v) : fmtINR(v));
-        var cur = key === overviewMetric ? ' style="font-weight:700"' : '';
-        return '<div class="t-row"' + cur + '><span class="k">' + m.label + '</span><span>' + txt + '</span></div>';
+      rows.map(function(x) {
+        var cur = x[0] === overviewMetric ? ' style="font-weight:700"' : '';
+        return '<div class="t-row"' + cur + '><span class="k">' + x[1] + '</span><span>' + x[2] + '</span></div>';
       }).join('');
   }
   document.addEventListener('dblclick', function(ev) {
