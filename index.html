@@ -603,9 +603,11 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
           <div class="panel-head">
             <div>
               <div class="panel-title">ASC day-on-day budget</div>
-              <div class="panel-sub">Pick one ASC &mdash; last 7 days: spend, revenue, ROAS (1-day click) and the budget in effect at the end of each day.</div>
+              <div class="panel-sub">Pick one ASC and a date range (default last 7 days): spend, revenue, ROAS (1-day click) and the budget in effect at the end of each day.</div>
             </div>
             <div class="control-group">
+              <span class="control-label">From</span><input type="date" class="daysel" id="budgetFrom">
+              <span class="control-label">To</span><input type="date" class="daysel" id="budgetTo">
               <span class="control-label">ASC</span>
               <input class="daysel" id="budgetSelect" list="budgetSelectList" autocomplete="off" placeholder="Search ASC…" style="min-width:260px;">
               <datalist id="budgetSelectList"></datalist>
@@ -2217,6 +2219,18 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       });
     }
 
+    (function() {
+      var fEl = document.getElementById('budgetFrom'), tEl = document.getElementById('budgetTo');
+      if (!fEl || fEl.dataset.built) return; fEl.dataset.built = '1';
+      var ds = []; Object.keys(bv.table2).forEach(function(k) { bv.table2[k].forEach(function(r) { ds.push(r.date); }); });
+      ds.sort(); var last = ds[ds.length - 1];
+      var first = (DATA.asc_view && DATA.asc_view.days && DATA.asc_view.days[0]) || ds[0];
+      var d7 = new Date(last + 'T00:00:00Z'); d7.setUTCDate(d7.getUTCDate() - 6);
+      fEl.min = tEl.min = first; fEl.max = tEl.max = last;
+      fEl.value = d7.toISOString().slice(0, 10); tEl.value = last;
+      var re = function() { renderBudgetTable2(); };
+      fEl.addEventListener('change', re); tEl.addEventListener('change', re);
+    })();
     var table2SortState = { key: null, dir: 1 };
     var budgetTable2HeadEl = document.querySelector('#budgetTable2 thead tr');
     if (budgetTable2HeadEl) enableColumnSort(budgetTable2HeadEl, table2SortState, renderBudgetTable2);
@@ -2225,6 +2239,18 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       var label = budgetSelectEl.value || (bv.table1[0] && bv.table1[0].label);
       var rawRows = bv.table2[label];
       var bodyEl = document.getElementById('budgetTable2Body');
+      if (rawRows) {
+        var fEl = document.getElementById('budgetFrom'), tEl = document.getElementById('budgetTo');
+        var t2 = {}; rawRows.forEach(function(r) { t2[r.date] = r; });
+        var ac = (DATA.asc_view && DATA.asc_view.campaigns || []).filter(function(c) { return c.label === label; })[0];
+        var by = (ac && ac.by_day) || {};
+        var all = {}; Object.keys(by).concat(Object.keys(t2)).forEach(function(d) { all[d] = 1; });
+        rawRows = Object.keys(all).sort().filter(function(d) { return (!fEl.value || d >= fEl.value) && (!tEl.value || d <= tEl.value); }).map(function(d) {
+          if (t2[d]) return t2[d];
+          var x = by[d] || {}, s = x.spend || 0, v = x.rev_1d || 0;
+          return { date: d, spend: s, rev: v, roas: s ? Math.round(v / s * 100) / 100 : 0, budget: null };
+        });
+      }
       if (!rawRows) { bodyEl.innerHTML = ''; return; }
       var rows = sortRows(rawRows, table2SortState, function(r, key) { return r[key]; });
       var t1row = bv.table1.filter(function(x) { return x.label === label; })[0];
