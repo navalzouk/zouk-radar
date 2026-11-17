@@ -2141,7 +2141,7 @@ tbody tr.table-summary-row td { font-weight: 700; background: var(--surface-2); 
       var t = s >= 100000 ? (s / 100000).toFixed(2) + 'L' : s >= 1000 ? Math.round(s / 1000) + 'k' : Math.round(s) + '';
       return t + ' (' + (r / s).toFixed(2) + ')';
     };
-    var d1h = document.getElementById('d1Head'); if (d1h && bv.d1_label) d1h.textContent = '1D Spend (ROAS) · ' + bv.d1_label;
+    var d1h = document.getElementById('d1Head'); if (d1h && bv.d1_label) d1h.textContent = '1D S(R) | ' + bv.d1_label.replace(' till ',' | ').replace(/^(\d+) (\w+)/,'$1$2');
 
     var noteEl = document.getElementById('budgetFetchedNote');
     if (noteEl && bv.fetched_at) {
